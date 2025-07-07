@@ -80,7 +80,7 @@ const sentences = [
   "We wouldn't poke it; \nwe would hum!", // 46.txt
   "When wouldn't it be shy \nwith us?", // 47.txt
   "It wouldn't be shy \nwith gentle friends!", // 48.txt
-  "Where can we test \nthis giant parachute?", // 49.txt
+  "Where could we test \nthis giant parachute?", // 49.txt
   "We can jump from \nthis tall cliff!", // 50.txt
   "Why can you be so brave \nnow?", // 51.txt
   "I can be brave \nwith you, Toto!", // 52.txt
@@ -2782,44 +2782,30 @@ function drawSingleSentenceBlock(sentenceObject, baseY, isQuestionBlock, blockCo
                 
                 // 두 번째 단어가 조동사인지 확인 (있을 경우)
                 const isSecondWordAux = words.length > 1 ? isAux(cleanedWords[1]) : false;
-                  // 패턴 식별
-                const pattern1 = isFirstWordWh && isSecondWordAux && words.length > 3;
-                const pattern2 = isFirstWordWh && isSecondWordAux && words.length <= 3;
-                
-                // 패턴 2에서 동사 인식을 위한 플래그
-                let foundVerbInPattern2 = blockContext.verbFoundInPattern2 || false;
-                
-                // 패턴 2(의문사+조동사+동사)에서 동사 이후에 나오는 단어는 모두 흰색으로
-                if (pattern2 && foundVerbInPattern2 && j > 2) {
-                    color = "#fff"; // 패턴 2에서 동사 이후 모든 단어는 흰색
-                }
-                // 위치에 따른 색상 적용
-                else if (j === 0 && isFirstWordWh) {
-                    // 의문사 - 항상 녹색
-                    color = '#249F24';
-                }
-                else if (j > 0 && isAux(cleanedWords[j])) {
-                    // 의문사 다음에 오는 모든 조동사(두 번째, 세 번째, ...)
-                    color = "#4A9FFF"; // 스카이 블루
-                }
-                else if (j === 2 && isAux(cleanedWords[1]) && !isAux(cleanedWords[2])) {
-                    // 조동사 다음에 오는 주어(의문사-조동사-주어 패턴)
-                    color = "#1A6DFF"; // 짙은 파란색
-                }
-                else if (j === 2) {
-                    // 세 번째 단어
-                    if (pattern1) {
-                        // 패턴 1: 의문사 + 조동사 + 주어 + 동사
+
+                // "패턴 1": 의문사 + 조동사 + 주어 + 동사 (총 4단어)
+                // 이전에 `words.length > 3`는 정확히 4개의 단어를 의도하는 것으로 보입니다.
+                const isPattern1 = isFirstWordWh && isSecondWordAux && words.length === 4;
+
+                if (isPattern1) {
+                    if (j === 0) { // 의문사
+                        color = '#249F24'; // 녹색
+                    } else if (j === 1) { // 조동사
+                        color = "#4A9FFF"; // 스카이 블루
+                    } else if (j === 2 || j === 3) { // 주어 또는 동사
                         color = "#1A6DFF"; // 짙은 파란색
-                    } else if (pattern2 && isVerb(cleanedWords[2])) {
-                        // 패턴 2: 의문사 + 조동사 + 동사
-                        color = "#1A6DFF"; // 짙은 파란색
-                        blockContext.verbFoundInPattern2 = true; // 패턴 2에서 동사 발견 표시
+                    } else {
+                        color = "#fff"; // 그 외는 흰색 (패턴 1은 4단어이므로 이 else는 작동하지 않을 것)
                     }
-                }
-                else if (j === 3 && pattern1 && isVerb(cleanedWords[3])) {
-                    // 패턴 1의 네 번째 단어 (동사)
-                    color = "#1A6DFF"; // 짙은 파란색
+                } else { // 패턴 1이 아닌 의문문 첫 번째 줄의 경우 (이전 로직 기반, 필요에 따라 조정)
+                    if (j === 0 && isFirstWordWh) {
+                        color = '#249F24'; // 의문사 - 녹색
+                    } else if (j > 0 && isAux(cleanedWords[j])) {
+                        color = "#4A9FFF"; // 조동사 - 스카이 블루
+                    }
+                    else {
+                        color = "#fff"; // 그 외는 흰색
+                    }
                 }
             }            // 의문문의 둘째줄은 모두 흰색으로 표시
             else if (isCurrentBlockContentQuestionType && i === 1) {
@@ -3844,7 +3830,16 @@ document.getElementById('startBtn').onclick = function() {
   }
 };
 document.getElementById('pauseBtn').onclick = togglePause;
-document.getElementById('stopBtn').onclick = stopGame;
+document.getElementById('stopBtn').onclick = function() {
+    // 드롭다운이 열려있을 때는 STOP 버튼 기능 비활성화
+    const sentenceList = document.getElementById('sentenceList');
+    if (sentenceList && sentenceList.style.display === 'block') {
+        console.log("드롭다운 열린 상태에서 STOP 버튼 클릭 - 무시");
+        return false;
+    }
+    
+    stopGame();
+};
 
 function resetGameStateForStartStop() {
     bullets = []; enemies = []; enemyBullets = []; detachedPetals = [];
@@ -4469,22 +4464,43 @@ function initializeSentenceDropdown() {
         if (event.cancelable) event.preventDefault();
         event.stopPropagation();
         
+        // 시작화면(!isGameRunning && !isGamePaused) 또는 게임 resume 상태(isGameRunning && isGamePaused)에서만 동작
+        const isStartScreen = !isGameRunning && !isGamePaused;
+        const isResumeState = isGameRunning && isGamePaused;
+        
+        if (!isStartScreen && !isResumeState) {
+            console.log("드롭다운 허용되지 않는 상태: 게임 실행 중");
+            return; // 게임 실행 중이면 드롭다운 불가
+        }
+        
         // 드롭다운 토글
         if (sentenceList.style.display === 'block') {
             console.log("드롭다운 닫기");
             sentenceList.style.display = 'none';
-            // 드롭다운 닫힐 때 게임 resume 및 버튼 활성화
+            // 드롭다운 닫힐 때 게임 상태 복원 및 버튼 활성화
+            stopDropdownMp3Playback(); // 영어 읽기 중단
+            
+            // 드롭다운 버튼 원상 복구
+            dropdownBtn.innerHTML = '&#9662;';
+            dropdownBtn.style.fontSize = '47px';
+            dropdownBtn.style.lineHeight = '';
+            dropdownBtn.style.minWidth = '';
+            dropdownBtn.style.minHeight = '';
+            dropdownBtn.style.padding = '';
+            
+            // 시작 화면으로 돌아갈 때 버튼 활성화
+            setTopButtonsDisabled(false);
+            
+            // resume 상태에서 드롭다운을 열었던 경우
             if (isDropdownPause) {
-                togglePause();
                 isDropdownPause = false;
-                setTopButtonsDisabled(false);
             }
+            
             // 하단 미디어가 일시정지 상태였다면 재생
             if (isDropdownBottomMediaPaused) {
                 if (typeof toggleBottomMediaPause === 'function') toggleBottomMediaPause();
                 isDropdownBottomMediaPaused = false;
             }
-            stopDropdownMp3Playback();
         } else {
             console.log("드롭다운 열기");
             // 항상 목록 새로 생성하여 최신 상태 유지
@@ -4493,6 +4509,9 @@ function initializeSentenceDropdown() {
             // 목록 표시
             sentenceList.style.display = 'block';
             
+            // 드롭다운 열릴 때 항상 버튼 비활성화
+            setTopButtonsDisabled(true);
+            
             // 현재 선택된 문장으로 스크롤
             setTimeout(() => {
                 const activeItem = sentenceList.querySelector(`.sentence-item:nth-child(${sentenceIndex + 1})`);
@@ -4500,19 +4519,33 @@ function initializeSentenceDropdown() {
                     activeItem.scrollIntoView({ behavior: 'auto', block: 'center' });
                 }
             }, 100); // 시간을 늘려 안정적으로 스크롤 처리
-            // 드롭다운 열릴 때 게임 일시정지 및 버튼 비활성화
-            if (isGameRunning && !isGamePaused) {
-                togglePause();
+            
+            // resume 상태에서 드롭다운을 열었을 경우 flag 설정
+            if (isGameRunning && isGamePaused) {
                 isDropdownPause = true;
-                setTopButtonsDisabled(true);
             }
+            
             // 하단 미디어가 재생 중이면 일시정지
             if (typeof isBottomMediaPlaying !== 'undefined' && isBottomMediaPlaying) {
                 if (typeof toggleBottomMediaPause === 'function') toggleBottomMediaPause();
                 isDropdownBottomMediaPaused = true;
             }
+            
+            // 드롭다운 버튼 모양 변경
+            dropdownBtn.style.position = 'relative';
+            dropdownBtn.innerHTML = `
+                <svg width="34" height="34" viewBox="0 0 34 34"
+                  style="display:block; position:relative; left:19px; top:19px;">
+                  <rect x="6" y="13" width="22" height="12" fill="white" />
+                </svg>
+            `;
+            dropdownBtn.style.fontSize = '6px';
+            dropdownBtn.style.lineHeight = '1';
+            dropdownBtn.style.minWidth = '0';
+            dropdownBtn.style.minHeight = '0';
+            dropdownBtn.style.padding = '0';
+            
             // 영어 문장 읽어주기 (현재 선택된 문장)
-            // speakSentence(sentences[sentenceIndex]); // <-- 이 줄을 주석처리 또는 삭제
             setTimeout(() => {
               dropdownMp3Index = (dropdownSentenceIndex + 1) % 96;
               playAllSentenceMp3sFromStart();
@@ -4539,14 +4572,20 @@ function initializeSentenceDropdown() {
         e.stopPropagation();
     }, { passive: true });
     
-    // 문서 클릭 시 드롭다운 닫기
+    // 문서 클릭 시 드롭다운 닫기 (드롭다운 버튼 클릭만 허용하도록 수정)
     document.removeEventListener('click', documentClickHandler);
     document.addEventListener('click', documentClickHandler);
     
     function documentClickHandler(event) {
-        if (sentenceList.style.display === 'block' && !sentenceList.contains(event.target) && event.target !== dropdownBtn) {
-            sentenceList.style.display = 'none';
-            // 화살표 모양 변경 없음 (고정)
+        // 드롭다운이 열려있을 때, 문장 목록 내부의 요소나 드롭다운 버튼 클릭만 처리
+        if (sentenceList.style.display === 'block') {
+            // 드롭다운 목록이나 버튼이 아닌 다른 요소 클릭 시 이벤트 무시
+            if (!sentenceList.contains(event.target) && event.target !== dropdownBtn) {
+                console.log("드롭다운 열린 상태에서 외부 요소 클릭 - 이벤트 차단");
+                event.preventDefault();
+                event.stopPropagation();
+                return false;
+            }
         }
     }
     
